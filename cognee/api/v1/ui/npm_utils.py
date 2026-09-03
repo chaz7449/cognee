@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List
 
 from cognee.shared.logging_utils import get_logger
-from .node_setup import get_nvm_sh_path
+from .node_setup import get_nvm_command, get_nvm_sh_path
 
 logger = get_logger()
 
@@ -15,14 +15,13 @@ def run_npm_command(cmd: List[str], cwd: Path, timeout: int = 300) -> subprocess
     Returns the CompletedProcess result.
     """
     if platform.system() == "Windows":
-        # On Windows, use shell=True for npm commands
+        # npm.cmd is discoverable by subprocess on Windows; do not invoke a shell.
         return subprocess.run(
             cmd,
             cwd=cwd,
             capture_output=True,
             text=True,
             timeout=timeout,
-            shell=True,
         )
     else:
         # On Unix-like systems, try direct command first
@@ -37,9 +36,8 @@ def run_npm_command(cmd: List[str], cwd: Path, timeout: int = 300) -> subprocess
         if result.returncode != 0:
             nvm_path = get_nvm_sh_path()
             if nvm_path.exists():
-                nvm_cmd = f"source {nvm_path} && {' '.join(cmd)}"
                 result = subprocess.run(
-                    ["bash", "-c", nvm_cmd],
+                    get_nvm_command(nvm_path, cmd),
                     cwd=cwd,
                     capture_output=True,
                     text=True,
