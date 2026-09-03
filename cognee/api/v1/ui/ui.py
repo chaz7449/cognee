@@ -15,7 +15,7 @@ import shutil
 
 from cognee.shared.logging_utils import get_logger
 from cognee.version import get_cognee_version
-from .node_setup import check_node_npm, get_nvm_dir, get_nvm_sh_path
+from .node_setup import check_node_npm, get_nvm_command, get_nvm_dir, get_nvm_sh_path
 from .npm_utils import run_npm_command
 
 logger = get_logger()
@@ -688,7 +688,7 @@ def start_ui(
 
     try:
         # Create frontend in its own process group for clean termination
-        # Use shell=True on Windows for npm commands
+        # npm.cmd is discoverable by subprocess on Windows; do not invoke a shell.
         if platform.system() == "Windows":
             process = subprocess.Popen(
                 ["npm", "run", "dev"],
@@ -696,14 +696,13 @@ def start_ui(
                 env=env,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                shell=True,
             )
         else:
             # On Unix-like systems, use bash with nvm sourced if available
             if nvm_path.exists():
                 # Use bash to source nvm and run npm
                 process = subprocess.Popen(
-                    ["bash", "-c", f"source {nvm_path} && npm run dev"],
+                    get_nvm_command(nvm_path, ["npm", "run", "dev"]),
                     cwd=frontend_path,
                     env=env,
                     stdout=subprocess.PIPE,
