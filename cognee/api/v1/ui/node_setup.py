@@ -11,6 +11,18 @@ from cognee.shared.logging_utils import get_logger
 logger = get_logger()
 
 
+def get_nvm_command(nvm_path: Path, cmd: list[str]) -> list[str]:
+    """Build a Bash command that sources nvm without interpolating untrusted values."""
+    return [
+        "bash",
+        "-c",
+        'source "$1" && shift && "$@"',
+        "bash",
+        str(nvm_path),
+        *cmd,
+    ]
+
+
 def get_nvm_dir() -> Path:
     """
     Get the nvm directory path following standard nvm installation logic.
@@ -43,7 +55,6 @@ def check_nvm_installed() -> bool:
                 capture_output=True,
                 text=True,
                 timeout=10,
-                shell=True,
             )
         else:
             # On Unix-like systems, nvm is a shell function, so we need to source it
@@ -55,7 +66,7 @@ def check_nvm_installed() -> bool:
 
             # Try to source nvm and check version, capturing errors
             result = subprocess.run(
-                ["bash", "-c", f"source {nvm_path} && nvm --version"],
+                get_nvm_command(nvm_path, ["nvm", "--version"]),
                 capture_output=True,
                 text=True,
                 timeout=10,
@@ -157,11 +168,8 @@ def install_node_with_nvm() -> bool:
             logger.error(f"nvm.sh not found at {nvm_path}. nvm may not be properly installed.")
             return False
 
-        nvm_source_cmd = f"source {nvm_path}"
-        install_cmd = f"{nvm_source_cmd} && nvm install node"
-
         result = subprocess.run(
-            ["bash", "-c", install_cmd],
+            get_nvm_command(nvm_path, ["nvm", "install", "node"]),
             capture_output=True,
             text=True,
             timeout=300,  # 5 minutes timeout for Node.js installation
@@ -171,9 +179,8 @@ def install_node_with_nvm() -> bool:
             logger.info("✓ Node.js installed successfully via nvm")
 
             # Set as default version
-            use_cmd = f"{nvm_source_cmd} && nvm alias default node"
             subprocess.run(
-                ["bash", "-c", use_cmd],
+                get_nvm_command(nvm_path, ["nvm", "alias", "default", "node"]),
                 capture_output=True,
                 text=True,
                 timeout=30,
@@ -221,7 +228,7 @@ def check_node_npm() -> tuple[bool, str]:  # (is_available, error_message)
             nvm_path = get_nvm_sh_path()
             if nvm_path.exists():
                 result = subprocess.run(
-                    ["bash", "-c", f"source {nvm_path} && node --version"],
+                    get_nvm_command(nvm_path, ["node", "--version"]),
                     capture_output=True,
                     text=True,
                     timeout=10,
@@ -253,7 +260,7 @@ def check_node_npm() -> tuple[bool, str]:  # (is_available, error_message)
             nvm_path = get_nvm_sh_path()
             if nvm_path.exists():
                 result = subprocess.run(
-                    ["bash", "-c", f"source {nvm_path} && node --version"],
+                    get_nvm_command(nvm_path, ["node", "--version"]),
                     capture_output=True,
                     text=True,
                     timeout=10,
@@ -278,9 +285,9 @@ def check_node_npm() -> tuple[bool, str]:  # (is_available, error_message)
 
         # Check npm - handle Windows PowerShell scripts
         if platform.system() == "Windows":
-            # On Windows, npm might be a PowerShell script, so we need to use shell=True
+            # npm.cmd is discoverable by subprocess on Windows; do not invoke a shell.
             result = subprocess.run(
-                ["npm", "--version"], capture_output=True, text=True, timeout=10, shell=True
+                ["npm", "--version"], capture_output=True, text=True, timeout=10
             )
         else:
             # On Unix-like systems, if we just installed via nvm, we may need to source nvm
@@ -293,7 +300,7 @@ def check_node_npm() -> tuple[bool, str]:  # (is_available, error_message)
                 nvm_path = get_nvm_sh_path()
                 if nvm_path.exists():
                     result = subprocess.run(
-                        ["bash", "-c", f"source {nvm_path} && npm --version"],
+                        get_nvm_command(nvm_path, ["npm", "--version"]),
                         capture_output=True,
                         text=True,
                         timeout=10,
@@ -342,7 +349,7 @@ def check_node_npm() -> tuple[bool, str]:  # (is_available, error_message)
                 nvm_path = get_nvm_sh_path()
                 if nvm_path.exists():
                     result = subprocess.run(
-                        ["bash", "-c", f"source {nvm_path} && npm --version"],
+                        get_nvm_command(nvm_path, ["npm", "--version"]),
                         capture_output=True,
                         text=True,
                         timeout=10,
